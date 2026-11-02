@@ -1,84 +1,12 @@
 "use strict";
 
-const bakeryProducts = [
-  {
-    id: "country-loaf",
-    name: "Country Loaf",
-    category: "Bread",
-    price: "$6–$12"
-  },
-  {
-    id: "multigrain",
-    name: "Multigrain Bread",
-    category: "Bread",
-    price: "$6–$12"
-  },
-  {
-    id: "croissants",
-    name: "Croissants",
-    category: "Pastry",
-    price: "$3–$7 each"
-  },
-  {
-    id: "cookies-muffins",
-    name: "Cookies and Muffins",
-    category: "Pastry",
-    price: "$3–$7 each"
-  },
-  {
-    id: "celebration-cake",
-    name: "Celebration Cake",
-    category: "Cake",
-    price: "$30–$75+"
-  },
-  {
-    id: "signature-loaf",
-    name: "North Star Signature Loaf",
-    category: "Bread",
-    price: "Contact for availability"
-  }
-];
-
 const FAVORITES_KEY = "northStarBakeryFavorites";
+const CUSTOMER_KEY = "northStarBakeryCustomer";
 
-document.addEventListener("DOMContentLoaded", initializeWebsite);
-
-function initializeWebsite() {
-  initializeFavorites();
-  initializeContactForm();
-}
-
-/* -----------------------------
-   Favorites feature
------------------------------ */
-
-function initializeFavorites() {
-  const favoritesSection = document.querySelector("#favorites-section");
-
-  if (!favoritesSection) {
-    return;
-  }
-
-  const favoriteButtons = document.querySelectorAll(".favorite-btn");
-
-  favoriteButtons.forEach(function (button) {
-    button.addEventListener("click", handleFavoriteClick);
-  });
-
-  renderFavorites();
-  updateFavoriteButtons();
-}
-
-function getSavedFavorites() {
-  const savedData = localStorage.getItem(FAVORITES_KEY);
-
-  if (!savedData) {
-    return [];
-  }
-
+function readStoredArray(key) {
   try {
-    const parsedData = JSON.parse(savedData);
-    return Array.isArray(parsedData) ? parsedData : [];
+    const value = JSON.parse(localStorage.getItem(key));
+    return Array.isArray(value) ? value : [];
   } catch (error) {
     return [];
   }
@@ -88,306 +16,144 @@ function saveFavorites(favorites) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
 }
 
-function handleFavoriteClick(event) {
-  const productId = event.currentTarget.dataset.productId;
-  toggleFavorite(productId);
+function updateFavoritesSummary(favorites) {
+  const count = document.querySelector("#favorite-count");
+  const list = document.querySelector("#favorite-list");
+  if (!count || !list) return;
+
+  count.textContent = String(favorites.length);
+  list.textContent = favorites.length
+    ? favorites.join(", ")
+    : "No favorites selected yet.";
 }
 
-function toggleFavorite(productId) {
-  const favorites = getSavedFavorites();
-  const isAlreadySaved = favorites.includes(productId);
+function toggleFavorite(productName, button) {
+  const favorites = readStoredArray(FAVORITES_KEY);
+  const index = favorites.indexOf(productName);
 
-  let updatedFavorites;
-
-  if (isAlreadySaved) {
-    updatedFavorites = favorites.filter(function (id) {
-      return id !== productId;
-    });
+  if (index >= 0) {
+    favorites.splice(index, 1);
   } else {
-    updatedFavorites = [...favorites, productId];
+    favorites.push(productName);
   }
 
-  saveFavorites(updatedFavorites);
-  renderFavorites();
-  updateFavoriteButtons();
+  saveFavorites(favorites);
+  updateFavoriteButton(button, favorites.includes(productName));
+  updateFavoritesSummary(favorites);
 }
 
-function getFavoriteProducts() {
-  const favoriteIds = getSavedFavorites();
-
-  return bakeryProducts.filter(function (product) {
-    return favoriteIds.includes(product.id);
-  });
+function updateFavoriteButton(button, isFavorite) {
+  button.classList.toggle("is-favorite", isFavorite);
+  button.setAttribute("aria-pressed", String(isFavorite));
+  button.textContent = isFavorite ? "Remove favorite" : "Save as favorite";
 }
 
-function renderFavorites() {
-  const favoriteList = document.querySelector("#favorite-list");
-  const favoriteCount = document.querySelector("#favorite-count");
-  const emptyMessage = document.querySelector("#favorites-empty");
-  const clearButton = document.querySelector("#clear-favorites");
+function initializeFavorites() {
+  const productCards = document.querySelectorAll("#product-choices .card");
+  if (!productCards.length) return;
 
-  if (!favoriteList || !favoriteCount || !emptyMessage) {
-    return;
-  }
+  const favorites = readStoredArray(FAVORITES_KEY);
+  productCards.forEach((card) => {
+    const heading = card.querySelector("h3");
+    const button = card.querySelector(".favorite-btn");
+    if (!heading || !button) return;
 
-  const favoriteProducts = getFavoriteProducts();
-
-  favoriteList.innerHTML = "";
-  favoriteCount.textContent = favoriteProducts.length;
-
-  if (favoriteProducts.length === 0) {
-    emptyMessage.hidden = false;
-
-    if (clearButton) {
-      clearButton.hidden = true;
-    }
-
-    return;
-  }
-
-  emptyMessage.hidden = true;
-
-  if (clearButton) {
-    clearButton.hidden = false;
-    clearButton.onclick = clearFavorites;
-  }
-
-  favoriteProducts.forEach(function (product) {
-    const listItem = document.createElement("li");
-    listItem.textContent =
-      product.name + " | " + product.category + " | " + product.price;
-
-    favoriteList.appendChild(listItem);
-  });
-}
-
-function updateFavoriteButtons() {
-  const favorites = getSavedFavorites();
-  const favoriteButtons = document.querySelectorAll(".favorite-btn");
-
-  favoriteButtons.forEach(function (button) {
-    const productId = button.dataset.productId;
-    const isSaved = favorites.includes(productId);
-
-    button.textContent = isSaved ? "Remove Favorite" : "Save Favorite";
-    button.classList.toggle("is-favorite", isSaved);
-    button.setAttribute("aria-pressed", String(isSaved));
-  });
-}
-
-function clearFavorites() {
-  localStorage.removeItem(FAVORITES_KEY);
-  renderFavorites();
-  updateFavoriteButtons();
-}
-
-/* -----------------------------
-   Contact form and validation
------------------------------ */
-
-function initializeContactForm() {
-  const form = document.querySelector("#preorder-form");
-
-  if (!form) {
-    return;
-  }
-
-  prefillFavoriteProducts(form);
-  prefillCustomerInformation(form);
-
-  form.addEventListener("submit", validateContactForm);
-
-  const fields = form.querySelectorAll("input, select, textarea");
-
-  fields.forEach(function (field) {
-    field.addEventListener("input", function () {
-      clearFieldError(field);
-    });
-
-    field.addEventListener("change", function () {
-      clearFieldError(field);
-    });
-  });
-}
-
-function prefillFavoriteProducts(form) {
-  const detailsField = form.querySelector("#details");
-
-  if (!detailsField || detailsField.value.trim() !== "") {
-    return;
-  }
-
-  const favoriteProducts = getFavoriteProducts();
-
-  if (favoriteProducts.length === 0) {
-    return;
-  }
-
-  const productNames = favoriteProducts.map(function (product) {
-    return product.name;
+    const productName = heading.textContent.trim();
+    updateFavoriteButton(button, favorites.includes(productName));
+    button.addEventListener("click", () => toggleFavorite(productName, button));
   });
 
-  detailsField.value = "I am interested in: " + productNames.join(", ") + ".";
-}
-
-function prefillCustomerInformation(form) {
-  const nameField = form.querySelector("#name");
-  const emailField = form.querySelector("#email");
-
-  const savedName = localStorage.getItem("northStarCustomerName");
-  const savedEmail = localStorage.getItem("northStarCustomerEmail");
-
-  if (nameField && savedName) {
-    nameField.value = savedName;
-  }
-
-  if (emailField && savedEmail) {
-    emailField.value = savedEmail;
-  }
-}
-
-function validateContactForm(event) {
-  event.preventDefault();
-
-  const form = event.currentTarget;
-  clearAllErrors(form);
-
-  const nameField = form.querySelector("#name");
-  const emailField = form.querySelector("#email");
-  const pickupDateField = form.querySelector("#pickup-date");
-  const requestTypeField = form.querySelector("#request-type");
-  const detailsField = form.querySelector("#details");
-  const formStatus = form.querySelector("#form-status");
-
-  let formIsValid = true;
-
-  if (nameField.value.trim().length < 2) {
-    showFieldError(
-      nameField,
-      "Please enter a name containing at least two characters."
-    );
-    formIsValid = false;
-  }
-
-  if (!isValidEmail(emailField.value.trim())) {
-    showFieldError(
-      emailField,
-      "Please enter a valid email address, such as name@example.com."
-    );
-    formIsValid = false;
-  }
-
-  if (!pickupDateField.value) {
-    showFieldError(
-      pickupDateField,
-      "Please select your preferred pickup date."
-    );
-    formIsValid = false;
-  } else if (!isFutureOrCurrentDate(pickupDateField.value)) {
-    showFieldError(
-      pickupDateField,
-      "Please choose today or a future pickup date."
-    );
-    formIsValid = false;
-  }
-
-  if (!requestTypeField.value) {
-    showFieldError(
-      requestTypeField,
-      "Please select the type of request."
-    );
-    formIsValid = false;
-  }
-
-  if (detailsField.value.trim().length < 10) {
-    showFieldError(
-      detailsField,
-      "Please provide at least 10 characters describing your request."
-    );
-    formIsValid = false;
-  }
-
-  if (!formIsValid) {
-    formStatus.textContent =
-      "Please correct the highlighted fields before submitting.";
-    formStatus.className = "form-status error-summary";
-
-    const firstInvalidField = form.querySelector("[aria-invalid='true']");
-
-    if (firstInvalidField) {
-      firstInvalidField.focus();
-    }
-
-    return;
-  }
-
-  saveCustomerInformation(nameField.value, emailField.value);
-
-  formStatus.textContent =
-    "Your request is valid and ready to be submitted.";
-  formStatus.className = "form-status success-message";
-
-  /*
-    This sample prevents an actual submission because the form action
-    is currently "#". Connect the form to a form processor before using
-    form.submit() on a live website.
-  */
-}
-
-function isValidEmail(email) {
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailPattern.test(email);
-}
-
-function isFutureOrCurrentDate(dateValue) {
-  const selectedDate = new Date(dateValue + "T00:00:00");
-  const today = new Date();
-
-  today.setHours(0, 0, 0, 0);
-
-  return selectedDate >= today;
-}
-
-function saveCustomerInformation(name, email) {
-  localStorage.setItem("northStarCustomerName", name.trim());
-  localStorage.setItem("northStarCustomerEmail", email.trim());
+  updateFavoritesSummary(favorites);
 }
 
 function showFieldError(field, message) {
-  const errorElement = document.querySelector("#" + field.id + "-error");
+  const error = document.querySelector(`#${field.id}-error`);
+  field.classList.toggle("input-error", Boolean(message));
+  field.setAttribute("aria-invalid", String(Boolean(message)));
+  if (error) error.textContent = message;
+}
 
-  field.setAttribute("aria-invalid", "true");
+function validateRequired(field, label) {
+  const isValid = field.value.trim().length > 0;
+  showFieldError(field, isValid ? "" : `${label} is required.`);
+  return isValid;
+}
 
-  if (errorElement) {
-    errorElement.textContent = message;
+function validateEmail(field) {
+  const value = field.value.trim();
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  showFieldError(field, isValid ? "" : "Enter a valid email address, such as name@example.com.");
+  return isValid;
+}
+
+function validateDetails(field) {
+  const value = field.value.trim();
+  const isValid = value.length >= 10;
+  showFieldError(field, isValid ? "" : "Please enter at least 10 characters so we can understand your request.");
+  return isValid;
+}
+
+function saveCustomer(name, email) {
+  localStorage.setItem(CUSTOMER_KEY, JSON.stringify({ name, email }));
+}
+
+function loadCustomer() {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOMER_KEY)) || {};
+  } catch (error) {
+    return {};
   }
 }
 
-function clearFieldError(field) {
-  const errorElement = document.querySelector("#" + field.id + "-error");
+function initializeFormValidation() {
+  const form = document.querySelector("#inquiry-form");
+  if (!form) return;
 
-  field.removeAttribute("aria-invalid");
+  const name = document.querySelector("#name");
+  const email = document.querySelector("#email");
+  const pickupDate = document.querySelector("#pickup-date");
+  const requestType = document.querySelector("#request-type");
+  const details = document.querySelector("#details");
+  const status = document.querySelector("#form-status");
 
-  if (errorElement) {
-    errorElement.textContent = "";
-  }
-}
+  const savedCustomer = loadCustomer();
+  if (savedCustomer.name) name.value = savedCustomer.name;
+  if (savedCustomer.email) email.value = savedCustomer.email;
 
-function clearAllErrors(form) {
-  const fields = form.querySelectorAll("input, select, textarea");
-  const errorMessages = form.querySelectorAll(".field-error");
-  const formStatus = form.querySelector("#form-status");
-
-  fields.forEach(function (field) {
-    field.removeAttribute("aria-invalid");
+  [name, email, pickupDate, requestType, details].forEach((field) => {
+    field.addEventListener("input", () => {
+      if (field === email) validateEmail(email);
+      else if (field === details) validateDetails(details);
+      else validateRequired(field, field.labels[0].textContent.replace("*", "").trim());
+    });
   });
 
-  errorMessages.forEach(function (errorMessage) {
-    errorMessage.textContent = "";
-  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
 
-  if (formStatus) {
-    formStatus.textContent = "";
-    formStatus.className = "form-status";
-  }
+    const checks = [
+      validateRequired(name, "Name"),
+      validateEmail(email),
+      validateRequired(pickupDate, "Preferred pickup date"),
+      validateRequired(requestType, "Request type"),
+      validateDetails(details)
+    ];
+
+    if (checks.every(Boolean)) {
+      saveCustomer(name.value.trim(), email.value.trim());
+      status.textContent = "Your information is valid. This sample form is ready to be connected to a form processor.";
+      status.className = "form-status success";
+    } else {
+      status.textContent = "Please correct the highlighted fields before submitting.";
+      status.className = "form-status error";
+      form.querySelector("[aria-invalid='true']")?.focus();
+    }
+  });
 }
+
+function initializePage() {
+  initializeFavorites();
+  initializeFormValidation();
+}
+
+document.addEventListener("DOMContentLoaded", initializePage);
